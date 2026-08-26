@@ -32,6 +32,36 @@ button { font: inherit; }
 .theme-button { display: grid; height: 36px; width: 36px; place-items: center; border: 1px solid rgb(36 49 45 / 30%); border-radius: 999px; color: #24312d; transition: all 180ms ease; }
 .theme-button:hover { border-color: rgb(85 117 104 / 60%); color: #557568; }
 .catalog-button { display: inline-flex; align-items: center; gap: 6px; color: rgb(36 49 45 / 65%); font-size: 13px; font-weight: 700; }
+.share-menu { position: relative; }
+.share-button { display: grid; height: 30px; width: 30px; place-items: center; border: 0; color: rgb(36 49 45 / 65%); }
+.share-button:hover { color: #557568; }
+.share-options { position: absolute; top: calc(100% + 8px); right: 0; z-index: 50; display: grid; min-width: 190px; gap: 3px; border: 1px solid rgb(36 49 45 / 14%); border-radius: 4px; background: #f7f4ee; padding: 6px; box-shadow: 0 8px 24px rgb(36 49 45 / 15%); }
+.share-options button { display: flex; align-items: center; gap: 8px; padding: 8px 9px; color: rgb(36 49 45 / 75%); font-size: 13px; text-align: left; }
+.share-options button:hover { background: rgb(85 117 104 / 9%); color: #557568; }
+.sidebar-tools { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid rgb(36 49 45 / 10%); padding-bottom: 18px; }
+.sidebar-tools button { display: inline-flex; align-items: center; gap: 7px; color: rgb(36 49 45 / 62%); font-size: 13px; font-weight: 700; text-align: left; }
+.topic-title-row { position: relative; z-index: 20; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.topic-meta-actions { display: flex; align-items: center; gap: 8px; }
+.favorite-button { display: grid; height: 30px; width: 30px; place-items: center; flex-shrink: 0; padding: 0; color: rgb(216 137 101 / 72%); transition: color 180ms ease, transform 180ms ease; }
+.favorite-button:hover, .favorite-button.active { color: #d88965; transform: scale(1.08); }
+.journal-panel { border-left: 2px solid #d88965; padding-left: 20px; }
+.journal-panel textarea { display: block; min-height: 120px; width: 100%; resize: vertical; border: 1px solid rgb(36 49 45 / 14%); border-radius: 3px; background: rgb(255 255 255 / 35%); margin-top: 18px; padding: 12px; color: #24312d; font: inherit; font-size: 14px; line-height: 1.6; outline: 0; }
+.journal-panel textarea:focus { border-color: rgb(216 137 101 / 62%); }
+.overview-outline { max-height: 520px; overflow-y: auto; border-top: 1px solid rgb(36 49 45 / 12%); scrollbar-width: thin; scrollbar-color: rgb(85 117 104 / 45%) transparent; }
+.overview-item { display: grid; width: 100%; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 14px; border: 0; border-bottom: 1px solid rgb(36 49 45 / 9%); background: transparent; padding: 13px 4px; text-align: left; }
+.overview-item:hover { background: rgb(85 117 104 / 8%); }
+.overview-item span, .overview-item em { color: rgb(36 49 45 / 55%); font-size: 12px; font-style: normal; }
+.overview-item strong { font-size: 14px; font-weight: 500; }
+.overview-actions { border-left: 1px solid rgb(36 49 45 / 12%); padding-left: 24px; }
+.saved-entry { border-left: 2px solid #d88965; background: rgb(216 137 101 / 7%); padding: 20px 22px; }
+.saved-entry:focus-visible, .saved-entry:hover { outline: 2px solid rgb(216 137 101 / 55%); outline-offset: 2px; }
+.saved-entry-meta { color: #557568; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.favorite-entry { display: flex; width: 100%; align-items: center; gap: 16px; color: inherit; text-align: left; }
+.favorite-entry > div { min-width: 0; flex: 1; }
+.resume-card { display: flex; max-width: 720px; align-items: flex-end; justify-content: space-between; gap: 24px; margin: 0 0 48px; border-left: 3px solid #d88965; background: rgb(216 137 101 / 8%); padding: 22px 24px; }
+.resume-kicker { color: #557568; font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
+.resume-course { margin-top: 12px; color: rgb(36 49 45 / 58%); font-size: 13px; font-weight: 700; }
+.resume-button { display: inline-flex; flex-shrink: 0; align-items: center; gap: 5px; border-bottom: 1px solid rgb(36 49 45 / 35%); padding-bottom: 5px; color: rgb(36 49 45 / 78%); font-size: 14px; font-weight: 700; }
 .library-topic-button { display: none; }
 .library-sidebar-search { display: flex; align-items: center; gap: 7px; margin: -4px 0 12px; border-bottom: 1px solid rgb(85 117 104 / 35%); padding: 6px 2px; color: #557568; }
 .library-sidebar-search input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; color: #24312d; font: inherit; font-size: 13px; }
@@ -45,6 +75,7 @@ button { font: inherit; }
 .day-navigation { position: relative; scrollbar-width: thin; scrollbar-color: rgb(85 117 104 / 45%) transparent; scroll-behavior: smooth; scroll-snap-type: x proximity; }
 .long-navigation { display: block; max-height: calc(100vh - 190px); overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; scrollbar-width: thin; scrollbar-color: rgb(85 117 104 / 45%) transparent; }
 .long-navigation .day-button { width: 100%; }
+.topic-check { flex-shrink: 0; color: #557568; opacity: .72; }
 .day-navigation .day-button { flex: 0 0 74px; scroll-snap-align: start; }
 .day-navigation .day-button { position: relative; z-index: 1; }
 .active-day-box { position: absolute; top: 0; left: 0; z-index: 0; border: 1px solid rgb(85 117 104 / 25%); border-radius: 4px; background: rgb(85 117 104 / 12%); pointer-events: none; transition: transform 360ms cubic-bezier(.22, 1, .36, 1), width 240ms ease, height 240ms ease; }
@@ -75,6 +106,22 @@ button { font: inherit; }
 :root.dark .theme-button { border-color: rgb(235 232 222 / 35%); color: #ebe8de; }
 :root.dark .theme-button:hover { border-color: rgb(135 177 157 / 70%); color: #87b19d; }
 :root.dark .catalog-button { color: rgb(235 232 222 / 70%); }
+:root.dark .share-button { color: rgb(235 232 222 / 70%); }
+:root.dark .share-options { border-color: rgb(235 232 222 / 18%); background: #1b2220; }
+:root.dark .share-options button { color: rgb(235 232 222 / 78%); }
+:root.dark .sidebar-tools { border-color: rgb(235 232 222 / 15%); }
+:root.dark .sidebar-tools button { color: rgb(235 232 222 / 65%); }
+:root.dark .journal-panel textarea { border-color: rgb(235 232 222 / 15%); background: rgb(235 232 222 / 5%); color: #ebe8de; }
+:root.dark .overview-outline { border-color: rgb(235 232 222 / 15%); }
+:root.dark .overview-outline { scrollbar-color: rgb(135 177 157 / 55%) transparent; }
+:root.dark .overview-item { border-color: rgb(235 232 222 / 12%); }
+:root.dark .overview-item span, :root.dark .overview-item em { color: rgb(235 232 222 / 55%); }
+:root.dark .overview-actions { border-color: rgb(235 232 222 / 15%); }
+:root.dark .saved-entry { background: rgb(216 137 101 / 12%); }
+:root.dark .topic-check { color: #87b19d; }
+:root.dark .resume-card { background: rgb(216 137 101 / 12%); }
+:root.dark .resume-course { color: rgb(235 232 222 / 58%); }
+:root.dark .resume-button { border-color: rgb(235 232 222 / 35%); color: rgb(235 232 222 / 80%); }
 .long-navigation { scrollbar-color: rgb(135 177 157 / 55%) transparent; }
 :root.dark .course-card { border-color: rgb(235 232 222 / 15%); background: rgb(235 232 222 / 4%); }
 :root.dark .course-card:hover, :root.dark .course-card.featured { border-color: rgb(135 177 157 / 55%); background: rgb(135 177 157 / 12%); }
@@ -90,6 +137,11 @@ button { font: inherit; }
 	.day-navigation .day-button { width: 100%; flex-basis: auto; }
 }
 @media (max-width: 640px) {
+	.topic-title-row { gap: 12px; }
+	.overview-item { grid-template-columns: 54px minmax(0, 1fr); gap: 8px; }
+	.overview-item em { grid-column: 2; }
+	.overview-actions { border-top: 1px solid rgb(36 49 45 / 12%); border-left: 0; padding: 20px 0 0; }
+	.resume-card { align-items: flex-start; flex-direction: column; gap: 18px; margin-bottom: 38px; padding: 18px; }
 	.library-topic-button { display: flex; width: 100%; align-items: center; gap: 9px; margin-bottom: 14px; border: 1px solid rgb(85 117 104 / 35%); border-radius: 4px; padding: 11px 12px; color: #557568; font-size: 14px; font-weight: 700; text-align: left; }
 	.library-sidebar-search { display: none; }
 	.library-topic-count { margin-left: auto; flex-shrink: 0; font-size: 11px; font-weight: 700; letter-spacing: .08em; opacity: .7; }
