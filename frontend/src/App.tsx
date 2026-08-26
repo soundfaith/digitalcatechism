@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { BookOpen, ChevronLeft, ChevronRight, Headphones, Moon, Pause, Play, Sun, Volume2 } from 'lucide-react'
-import { sevenDayCourse } from './data/course'
+import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Headphones, Moon, Pause, Play, Search, Sun, X } from 'lucide-react'
+import { completeCccLibrary, fourteenDayCourse, sevenDayCourse, thirtyDayCourse } from './data/course'
 
 const partColors = {
   Creed: 'bg-moss text-white',
@@ -9,9 +9,60 @@ const partColors = {
   Prayer: 'bg-sky-700 text-white',
 }
 
+type CourseId = 'seven' | 'fourteen' | 'thirty' | 'library'
+type View = 'landing' | 'reader'
+
+const courses = {
+  seven: {
+    title: 'CCC in 7 Days',
+    description: 'A gentle first walk through the essential shape of Catholic faith.',
+    detail: 'Seven quiet steps',
+    topics: sevenDayCourse,
+  },
+  fourteen: {
+    title: 'CCC in 14 Days',
+    description: 'A slower, deeper journey through the essential shape of Catholic faith.',
+    detail: 'Fourteen unhurried steps',
+    topics: fourteenDayCourse,
+  },
+  thirty: {
+    title: 'CCC in 30 Days',
+    description: 'The deepest journey through the essential shape of Catholic faith, with room to stay and grow.',
+    detail: 'Thirty days of depth',
+    topics: thirtyDayCourse,
+  },
+  library: {
+    title: 'Complete CCC Library',
+    description: 'A structured reference library covering the Catechism’s major doctrinal and spiritual themes.',
+    detail: 'The complete library',
+    topics: completeCccLibrary,
+  },
+} as const
+
+const resumeStorageKey = 'digital-catechism-resume'
+type ResumeState = Partial<Record<CourseId, number>>
+
+const readResumeState = (): ResumeState => {
+  try {
+    return JSON.parse(window.localStorage.getItem(resumeStorageKey) ?? '{}') as ResumeState
+  } catch {
+    return {}
+  }
+}
+
 export default function App() {
-  const [activeDay, setActiveDay] = useState(1)
+  const [resumeState, setResumeState] = useState<ResumeState>(readResumeState)
+  const [selectedCourse, setSelectedCourse] = useState<CourseId>(() => {
+    const saved = readResumeState()
+    return saved.library ? 'library' : saved.thirty ? 'thirty' : saved.fourteen ? 'fourteen' : 'seven'
+  })
+  const [view, setView] = useState<View>(() => Object.keys(readResumeState()).length ? 'reader' : 'landing')
+  const [activeDay, setActiveDay] = useState(() => readResumeState().library ?? readResumeState().thirty ?? readResumeState().fourteen ?? readResumeState().seven ?? 1)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [audioProgress, setAudioProgress] = useState(0)
+  const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false)
+  const [librarySearch, setLibrarySearch] = useState('')
+  const [librarySidebarSearch, setLibrarySidebarSearch] = useState('')
   const [transitionDirection, setTransitionDirection] = useState<'next' | 'previous'>('next')
   const [isDark, setIsDark] = useState(() => {
     const savedTheme = window.localStorage.getItem('digital-catechism-theme')
@@ -21,13 +72,47 @@ export default function App() {
   const touchStart = useRef<{ x: number; y: number } | null>(null)
   const dayNavigationRef = useRef<HTMLElement | null>(null)
   const dayButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({})
-  const topic = sevenDayCourse[activeDay - 1]
+  const audioTimerRef = useRef<number | null>(null)
+  const speechRunRef = useRef(0)
+  const activeCourse = courses[selectedCourse].topics
+  const isLibrary = selectedCourse === 'library'
+  const isLongCourse = activeCourse.length >= 14
+  const topic = activeCourse[activeDay - 1]
+
+  const libraryTopicsByPart = (['Creed', 'Sacraments', 'Morality', 'Prayer'] as const).map((part) => ({
+    part,
+    topics: activeCourse.map((item, index) => ({ item, index })).filter(({ item }) => item.part === part && item.title.toLowerCase().includes(librarySearch.toLowerCase())),
+  })).filter(({ topics }) => topics.length > 0)
+  const visibleLibraryTopics = isLibrary ? activeCourse.filter((item) => item.title.toLowerCase().includes(librarySidebarSearch.toLowerCase())) : activeCourse
+
+  const openCourse = (courseId: CourseId) => {
+    const nextDay = resumeState[courseId] ?? 1
+    const nextResumeState = { ...resumeState, [courseId]: nextDay }
+    setSelectedCourse(courseId)
+    setActiveDay(nextDay)
+    setResumeState(nextResumeState)
+    window.localStorage.setItem(resumeStorageKey, JSON.stringify(nextResumeState))
+    setView('reader')
+  }
+
+  const showLanding = () => {
+    speechRunRef.current += 1
+    window.speechSynthesis.cancel()
+    if (audioTimerRef.current !== null) window.clearInterval(audioTimerRef.current)
+    setIsPlaying(false)
+    setAudioProgress(0)
+    setView('landing')
+  }
 
   const goToDay = (day: number) => {
-    const nextDay = Math.max(1, Math.min(sevenDayCourse.length, day))
+    const nextDay = Math.max(1, Math.min(activeCourse.length, day))
     if (nextDay === activeDay) return
     setTransitionDirection(nextDay > activeDay ? 'next' : 'previous')
     setActiveDay(nextDay)
+    setIsLibraryPickerOpen(false)
+    const nextResumeState = { ...resumeState, [selectedCourse]: nextDay }
+    setResumeState(nextResumeState)
+    window.localStorage.setItem(resumeStorageKey, JSON.stringify(nextResumeState))
   }
 
   useEffect(() => {
@@ -52,6 +137,10 @@ export default function App() {
     }
 
     const keepActiveButtonVisible = () => {
+      if (isLongCourse) {
+        activeButton.scrollIntoView({ block: 'nearest' })
+        return
+      }
       const navigationBounds = navigation.getBoundingClientRect()
       const buttonBounds = activeButton.getBoundingClientRect()
       const hiddenOnLeft = buttonBounds.left < navigationBounds.left
@@ -77,7 +166,7 @@ export default function App() {
       window.removeEventListener('resize', updateActiveDayBox)
       navigation.removeEventListener('scroll', updateActiveDayBox)
     }
-  }, [activeDay])
+  }, [activeDay, activeCourse.length, isLongCourse])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -86,40 +175,111 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [activeDay])
+  }, [activeDay, selectedCourse])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsLibraryPickerOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   useEffect(() => {
     window.speechSynthesis.cancel()
+    speechRunRef.current += 1
+    if (audioTimerRef.current !== null) window.clearInterval(audioTimerRef.current)
     setIsPlaying(false)
+    setAudioProgress(0)
     return () => window.speechSynthesis.cancel()
-  }, [activeDay])
+  }, [activeDay, selectedCourse])
 
-  const toggleSpeech = () => {
+  const startSpeech = () => {
     if (!('speechSynthesis' in window)) return
 
-    if (isPlaying) {
-      window.speechSynthesis.cancel()
-      setIsPlaying(false)
-      return
-    }
-
-    const script = [
+    const segments = [
       topic.title,
       topic.introduction,
       ...topic.summary,
-      'For today.',
       ...topic.application,
-      `Stay with it. ${topic.reflection}`,
-    ].join(' ')
-    const utterance = new SpeechSynthesisUtterance(script)
-    utterance.lang = 'en-US'
-    utterance.rate = 0.95
-    utterance.onend = () => setIsPlaying(false)
-    utterance.onerror = () => setIsPlaying(false)
+      topic.reflection,
+    ]
+    const segmentDurations = segments.map((segment) => Math.max(1300, segment.length * 68))
+    const estimatedDuration = segmentDurations.reduce((total, duration) => total + duration, 0) + (segments.length - 1) * 450
+    const runId = speechRunRef.current + 1
+    speechRunRef.current = runId
+    const startedAt = Date.now()
+    if (audioTimerRef.current !== null) window.clearInterval(audioTimerRef.current)
+    audioTimerRef.current = window.setInterval(() => setAudioProgress(Math.min(99, ((Date.now() - startedAt) / estimatedDuration) * 100)), 100)
+
+    const speakSegment = (segmentIndex: number) => {
+      if (speechRunRef.current !== runId) return
+      if (segmentIndex >= segments.length) {
+        if (audioTimerRef.current !== null) window.clearInterval(audioTimerRef.current)
+        setAudioProgress(100)
+        setIsPlaying(false)
+        return
+      }
+
+      const utterance = new SpeechSynthesisUtterance(segments[segmentIndex])
+      utterance.lang = 'en-US'
+      utterance.rate = 0.95
+      utterance.onend = () => window.setTimeout(() => speakSegment(segmentIndex + 1), 450)
+      utterance.onerror = () => {
+        if (audioTimerRef.current !== null) window.clearInterval(audioTimerRef.current)
+        setIsPlaying(false)
+      }
+      window.speechSynthesis.speak(utterance)
+    }
 
     window.speechSynthesis.cancel()
-    window.speechSynthesis.speak(utterance)
+    setAudioProgress(0)
+    speakSegment(0)
     setIsPlaying(true)
+  }
+
+  const toggleSpeech = () => {
+    if (!('speechSynthesis' in window)) return
+    if (isPlaying) {
+      speechRunRef.current += 1
+      window.speechSynthesis.cancel()
+      if (audioTimerRef.current !== null) window.clearInterval(audioTimerRef.current)
+      setIsPlaying(false)
+      setAudioProgress(0)
+      return
+    }
+    startSpeech()
+  }
+
+  if (view === 'landing') {
+    return (
+      <main className={`min-h-screen bg-parchment text-ink transition-colors ${isDark ? 'dark' : ''}`}>
+        <header className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="shrink-0 rounded-full bg-ink p-2 text-parchment"><BookOpen size={18} /></div>
+            <span className="truncate font-display text-xl">Digital Catechism</span>
+          </div>
+          <button className="theme-button" type="button" aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setIsDark((themeIsDark) => !themeIsDark)}>
+            {isDark ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+        </header>
+        <section className="mx-auto max-w-7xl px-5 pb-24 pt-14 sm:px-8 sm:pt-24">
+          <p className="mb-4 text-xs font-bold uppercase tracking-[0.25em] text-moss">Begin where you are</p>
+          <h1 className="max-w-3xl font-display text-5xl leading-[0.98] sm:text-7xl">A faithful rhythm for every season.</h1>
+          <p className="mt-7 max-w-2xl text-xl leading-relaxed text-ink/70">Choose a course and make a little room each day for the essential shape of Catholic faith.</p>
+          <div className="mt-16 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <button className="course-card" type="button" onClick={() => openCourse('seven')}>
+              <span className="course-card-number">01</span><span className="course-card-kicker">A short beginning</span><h2 className="font-display text-3xl">CCC in 7 Days</h2><p className="mt-4 text-base leading-relaxed text-ink/65">{courses.seven.description}</p><span className="course-card-action">Start the journey <ChevronRight size={17} /></span>
+            </button>
+            <button className="course-card featured" type="button" onClick={() => openCourse('fourteen')}>
+              <span className="course-card-number">02</span><span className="course-card-kicker">More room to linger</span><h2 className="font-display text-3xl">CCC in 14 Days</h2><p className="mt-4 text-base leading-relaxed text-ink/65">{courses.fourteen.description}</p><span className="course-card-action">Start the journey <ChevronRight size={17} /></span>
+            </button>
+            <button className="course-card featured" type="button" onClick={() => openCourse('thirty')}><span className="course-card-number">03</span><span className="course-card-kicker">The full journey</span><h2 className="font-display text-3xl">CCC in 30 Days</h2><p className="mt-4 text-base leading-relaxed text-ink/65">{courses.thirty.description}</p><span className="course-card-action">Start the journey <ChevronRight size={17} /></span></button>
+            <button className="course-card" type="button" onClick={() => openCourse('library')}><span className="course-card-number">04</span><span className="course-card-kicker">Reference and discovery</span><h2 className="font-display text-3xl">Complete CCC Library</h2><p className="mt-4 text-base leading-relaxed text-ink/65">{courses.library.description}</p><span className="course-card-action">Explore the library <ChevronRight size={17} /></span></button>
+          </div>
+        </section>
+      </main>
+    )
   }
 
   return (
@@ -127,10 +287,11 @@ export default function App() {
       <header className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <div className="shrink-0 rounded-full bg-ink p-2 text-parchment"><BookOpen size={18} /></div>
-          <span className="truncate font-display text-xl">Digital Catechism</span>
+          <button className="truncate font-display text-xl" type="button" onClick={showLanding}>Digital Catechism</button>
         </div>
         <div className="flex items-center gap-4">
-          <span className="hidden text-xs font-bold uppercase tracking-[0.2em] text-moss sm:block">A seven-day walk</span>
+          <button className="catalog-button" type="button" onClick={showLanding}><ArrowLeft size={16} /> <span className="hidden sm:inline">All courses</span></button>
+          <span className="hidden text-xs font-bold uppercase tracking-[0.2em] text-moss sm:block">{courses[selectedCourse].detail}</span>
           <button className="theme-button" type="button" aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setIsDark((themeIsDark) => !themeIsDark)}>
             {isDark ? <Sun size={17} /> : <Moon size={17} />}
           </button>
@@ -140,19 +301,22 @@ export default function App() {
       <div className="mx-auto grid min-w-0 max-w-7xl gap-8 px-5 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-8 lg:grid-cols-[280px_1fr] lg:gap-16 lg:pb-32">
         <aside className="min-w-0 pt-5 lg:sticky lg:top-5 lg:h-fit">
           <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-moss">Your journey</p>
-          <nav ref={dayNavigationRef} className="day-navigation min-w-0 max-w-full flex gap-2 overflow-x-auto pb-2 lg:block lg:space-y-2">
+          {isLibrary && <label className="library-sidebar-search"><Search size={15} /><input type="search" aria-label="Search library topics" placeholder="Search topics" value={librarySidebarSearch} onChange={(event) => setLibrarySidebarSearch(event.target.value)} /></label>}
+          {isLibrary && <button className="library-topic-button" type="button" onClick={() => setIsLibraryPickerOpen(true)}><Search size={16} /><span className="truncate">{topic.title}</span><span className="library-topic-count">{activeDay} / {activeCourse.length}</span></button>}
+          <nav ref={dayNavigationRef} className={`day-navigation min-w-0 max-w-full gap-2 pb-2 ${isLongCourse && isLibrary ? 'long-navigation' : 'flex overflow-x-auto lg:block lg:space-y-2'}`}>
             <span className="active-day-box" aria-hidden="true" style={{ transform: `translate(${activeDayBox.x}px, ${activeDayBox.y}px)`, width: activeDayBox.width, height: activeDayBox.height }} />
-            {sevenDayCourse.map((day) => (
+            {visibleLibraryTopics.map((day) => (
               <button ref={(element) => { dayButtonRefs.current[day.day] = element }} key={day.day} onClick={() => goToDay(day.day)} aria-current={activeDay === day.day ? 'step' : undefined} className={`day-button ${activeDay === day.day ? 'active' : ''}`}>
-                <span className="text-xs font-bold uppercase tracking-wider">Day {day.day}</span>
+                <span className="text-xs font-bold uppercase tracking-wider">{isLibrary ? String(day.day).padStart(3, '0') : `Day ${day.day}`}</span>
                 <span className="hidden truncate text-sm lg:block">{day.title}</span>
               </button>
             ))}
           </nav>
+          {isLibrary && isLibraryPickerOpen && <div className="library-picker-backdrop" role="presentation" onClick={() => setIsLibraryPickerOpen(false)}><section className="library-picker" role="dialog" aria-modal="true" aria-label="Choose a library topic" onClick={(event) => event.stopPropagation()}><div className="library-picker-header"><div><p className="section-label">Table of contents</p><h2 className="font-display text-2xl">Explore the library</h2></div><button className="theme-button" type="button" aria-label="Close topic selector" onClick={() => setIsLibraryPickerOpen(false)}><X size={17} /></button></div><label className="library-search"><Search size={16} /><input autoFocus type="search" placeholder="Search topics" value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} /></label><div className="library-picker-list">{libraryTopicsByPart.map(({ part, topics }) => <div key={part}><p className="library-picker-part">{part}</p>{topics.map(({ item, index }) => <button key={item.day} type="button" className={`library-picker-topic ${activeDay === index + 1 ? 'active' : ''}`} onClick={() => goToDay(index + 1)}><span>{String(item.day).padStart(3, '0')}</span><strong>{item.title}</strong></button>)}</div>)}{libraryTopicsByPart.length === 0 && <p className="text-sm text-ink/60">No topics found.</p>}</div></section></div>}
           <div className="mt-8 hidden border-t border-ink/10 pt-5 text-sm leading-relaxed text-ink/60 lg:block">
-            <p>Seven quiet steps through the essential shape of Catholic faith.</p>
-            <div className="mt-5 h-1 rounded-full bg-ink/10"><div className="h-full rounded-full bg-moss transition-all" style={{ width: `${(activeDay / 7) * 100}%` }} /></div>
-            <p className="mt-2 text-xs font-bold uppercase tracking-wider text-moss">{activeDay} of 7 complete</p>
+            <p>{isLibrary ? 'A reference path through the Catechism’s major themes.' : `${selectedCourse === 'seven' ? 'Seven quiet steps' : 'Fourteen unhurried steps'} through the essential shape of Catholic faith.`}</p>
+            <div className="mt-5 h-1 rounded-full bg-ink/10"><div className="h-full rounded-full bg-moss transition-all" style={{ width: `${(activeDay / activeCourse.length) * 100}%` }} /></div>
+            <p className="mt-2 text-xs font-bold uppercase tracking-wider text-moss">{isLibrary ? `${activeDay} of ${activeCourse.length} topics` : `${activeDay} of ${activeCourse.length} complete`}</p>
           </div>
         </aside>
 
@@ -163,7 +327,7 @@ export default function App() {
           if (Math.abs(horizontalDistance) > 60 && Math.abs(horizontalDistance) > Math.abs(verticalDistance)) goToDay(activeDay + (horizontalDistance < 0 ? 1 : -1))
           touchStart.current = null
         }}>
-          <div className="mb-8 flex items-center justify-between text-sm text-ink/50"><span>Day {String(topic.day).padStart(2, '0')}</span><span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${partColors[topic.part]}`}>{topic.part}</span></div>
+          <div className="mb-8 flex items-center justify-between text-sm text-ink/50"><span>{isLibrary ? `Topic ${String(topic.day).padStart(3, '0')}` : `Day ${String(topic.day).padStart(2, '0')}`}</span><span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${partColors[topic.part]}`}>{topic.part}</span></div>
           <p className="mb-3 font-bold uppercase tracking-[0.25em] text-moss">{topic.part} / The essentials</p>
           <h1 className="max-w-3xl font-display text-5xl leading-[0.98] sm:text-7xl">{topic.title}</h1>
           <p className="mt-8 max-w-2xl text-xl leading-relaxed text-ink/70">{topic.introduction}</p>
@@ -173,11 +337,11 @@ export default function App() {
             <div className="space-y-8"><div><h2 className="section-label">For today</h2><div className="space-y-3 text-base leading-relaxed text-ink/75">{topic.application.map((line) => <p key={line}>{line}</p>)}</div></div><div className="border-l-2 border-clay pl-5"><h2 className="section-label">Stay with it</h2><p className="font-display text-2xl leading-snug">{topic.reflection}</p></div></div>
           </div>
 
-          <div className="mt-14 flex justify-between border-t border-ink/10 pt-5"><button className="nav-button" disabled={activeDay === 1} onClick={() => goToDay(activeDay - 1)}><ChevronLeft size={18} /> Previous</button><button className="nav-button" disabled={activeDay === 7} onClick={() => goToDay(activeDay + 1)}>Next <ChevronRight size={18} /></button></div>
+          <div className="mt-14 flex justify-between border-t border-ink/10 pt-5"><button className="nav-button" disabled={activeDay === 1} onClick={() => goToDay(activeDay - 1)}><ChevronLeft size={18} /> Previous</button><button className="nav-button" disabled={activeDay === activeCourse.length} onClick={() => goToDay(activeDay + 1)}>Next <ChevronRight size={18} /></button></div>
         </section>
       </div>
 
-      <div className="audio-dock"><div className="mx-auto flex max-w-7xl items-center gap-4 px-5 py-3 sm:px-8"><div className="hidden rounded-full bg-clay/15 p-2 text-clay sm:block"><Headphones size={18} /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">Daily reflection</p><p className="text-xs text-ink/55">Browser narration · Day {activeDay}</p></div><button aria-label={isPlaying ? 'Pause narration' : 'Read aloud'} className="play-button" onClick={toggleSpeech}>{isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}</button><div className="hidden items-center gap-2 sm:flex"><Volume2 size={16} className="text-ink/50" /><div className="h-1 w-24 rounded-full bg-ink/15"><div className="h-full w-1/3 rounded-full bg-clay" /></div></div></div></div>
+      <div className="audio-dock"><div className="mx-auto max-w-7xl px-5 py-3 sm:px-8"><div className="audio-controls"><div className="hidden rounded-full bg-clay/15 p-2 text-clay sm:block"><Headphones size={18} /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{isLibrary ? 'Topic reflection' : 'Daily reflection'}</p><p className="text-xs text-ink/55">Browser narration · {isLibrary ? topic.title : `Day ${activeDay}`}</p></div><button aria-label={isPlaying ? 'Pause narration' : 'Read aloud'} className="play-button" onClick={toggleSpeech}>{isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}</button><div className="audio-progress" role="progressbar" aria-label="Narration progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(audioProgress)}><div style={{ width: `${audioProgress}%` }} /></div></div></div></div>
     </main>
   )
 }
