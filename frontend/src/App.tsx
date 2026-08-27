@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowLeft, BookOpen, Check, ChevronLeft, ChevronRight, Clock3, Copy, Headphones, Heart, Mail, MessageCircle, Moon, NotebookPen, Pause, Play, Search, Share2, Sun, X } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Clock3, Copy, Headphones, Heart, Mail, MessageCircle, Moon, NotebookPen, Pause, Play, Search, Share2, Sun, X } from 'lucide-react'
 import { completeCccLibrary, fourteenDayCourse, sevenDayCourse, thirtyDayCourse } from './data/course'
 
 const partColors = {
@@ -114,6 +114,7 @@ export default function App() {
   const shareMenuRef = useRef<HTMLDivElement | null>(null)
   const audioTimerRef = useRef<number | null>(null)
   const speechRunRef = useRef(0)
+  const hasReadTopicRef = useRef(false)
   const activeCourse = courses[selectedCourse].topics
   const isLibrary = selectedCourse === 'library'
   const isLongCourse = activeCourse.length >= 14
@@ -129,6 +130,17 @@ export default function App() {
   const resumeDay = resumeCourseId ? resumeState[resumeCourseId] ?? 1 : 1
   const resumeTopic = resumeCourse?.topics[resumeDay - 1]
 
+  const markTopicComplete = (courseId: CourseId, day: number) => {
+    if (courseId === 'library') return
+    setCompletedState((currentState) => {
+      const currentCompleted = currentState[courseId] ?? []
+      if (currentCompleted.includes(day)) return currentState
+      const nextCompletedState = { ...currentState, [courseId]: [...currentCompleted, day].sort((left, right) => left - right) }
+      window.localStorage.setItem(completedStorageKey, JSON.stringify(nextCompletedState))
+      return nextCompletedState
+    })
+  }
+
   const libraryTopicsByPart = (['Creed', 'Sacraments', 'Morality', 'Prayer'] as const).map((part) => ({
     part,
     topics: activeCourse.map((item, index) => ({ item, index })).filter(({ item }) => item.part === part && item.title.toLowerCase().includes(librarySearch.toLowerCase())),
@@ -142,6 +154,16 @@ export default function App() {
     setResumeState(nextResumeState)
     window.localStorage.setItem(resumeStorageKey, JSON.stringify(nextResumeState))
   }, [activeDay, safeActiveDay, selectedCourse])
+
+  useEffect(() => {
+    hasReadTopicRef.current = false
+    if (isLibrary) return
+    const readTimer = window.setTimeout(() => {
+      hasReadTopicRef.current = true
+      markTopicComplete(selectedCourse, safeActiveDay)
+    }, 10000)
+    return () => window.clearTimeout(readTimer)
+  }, [isLibrary, safeActiveDay, selectedCourse])
 
   useEffect(() => {
     if (!route) return
@@ -206,6 +228,10 @@ export default function App() {
   }
 
   const saveJournal = (value: string) => {
+    if (value.trim()) {
+      hasReadTopicRef.current = true
+      markTopicComplete(selectedCourse, safeActiveDay)
+    }
     const nextJournalState = { ...journalState, [journalKey]: value }
     setJournalState(nextJournalState)
     window.localStorage.setItem(journalStorageKey, JSON.stringify(nextJournalState))
@@ -229,17 +255,15 @@ export default function App() {
     window.history.pushState({}, '', '/')
   }
 
-  const goToDay = (day: number) => {
+  const goToDay = (day: number, isNextTopicClick = false) => {
     const nextDay = Math.max(1, Math.min(activeCourse.length, day))
     if (nextDay === activeDay) return
     setTransitionDirection(nextDay > activeDay ? 'next' : 'previous')
     setActiveDay(nextDay)
     window.history.pushState({}, '', topicPath(selectedCourse, nextDay))
     setIsLibraryPickerOpen(false)
-    if (!isLibrary && nextDay > activeDay) {
-      const nextCompletedState = { ...completedState, [selectedCourse]: Array.from(new Set([...(completedState[selectedCourse] ?? []), activeDay])).sort((left, right) => left - right) }
-      setCompletedState(nextCompletedState)
-      window.localStorage.setItem(completedStorageKey, JSON.stringify(nextCompletedState))
+    if (!isLibrary && nextDay > activeDay && (isNextTopicClick || hasReadTopicRef.current)) {
+      markTopicComplete(selectedCourse, activeDay)
     }
     const nextResumeState = { ...resumeState, [selectedCourse]: nextDay }
     setResumeState(nextResumeState)
@@ -398,6 +422,9 @@ export default function App() {
   const startSpeech = () => {
     if (!('speechSynthesis' in window)) return
 
+    hasReadTopicRef.current = true
+    markTopicComplete(selectedCourse, safeActiveDay)
+
     const segments = [
       topic.title,
       topic.introduction,
@@ -528,8 +555,8 @@ export default function App() {
           <nav ref={dayNavigationRef} className={`day-navigation min-w-0 max-w-full gap-2 pb-2 ${isLongCourse && isLibrary ? 'long-navigation' : 'flex overflow-x-auto lg:block lg:space-y-2'}`}>
             <span className="active-day-box" aria-hidden="true" style={{ transform: `translate(${activeDayBox.x}px, ${activeDayBox.y}px)`, width: activeDayBox.width, height: activeDayBox.height }} />
             {visibleLibraryTopics.map((day) => (
-              <button ref={(element) => { dayButtonRefs.current[day.day] = element }} key={day.day} onClick={() => goToDay(day.day)} aria-current={activeDay === day.day ? 'step' : undefined} className={`day-button ${activeDay === day.day ? 'active' : ''}`}>
-                <span className="flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wider"><span>{isLibrary ? String(day.day).padStart(3, '0') : `Day ${day.day}`}</span>{!isLibrary && completedState[selectedCourse]?.includes(day.day) && <Check className="topic-check" size={14} strokeWidth={2.5} aria-label="Completed" />}</span>
+              <button ref={(element) => { dayButtonRefs.current[day.day] = element }} key={day.day} onClick={() => goToDay(day.day)} aria-current={activeDay === day.day ? 'step' : undefined} className={`day-button ${activeDay === day.day ? 'active' : ''} ${!isLibrary && completedState[selectedCourse]?.includes(day.day) ? 'completed' : ''}`}>
+                <span className="flex items-center text-xs font-bold uppercase tracking-wider"><span>{isLibrary ? String(day.day).padStart(3, '0') : `Day ${day.day}`}</span></span>
                 <span className="hidden truncate text-sm lg:block">{day.title}</span>
               </button>
             ))}
@@ -549,7 +576,7 @@ export default function App() {
           if (Math.abs(horizontalDistance) > 60 && Math.abs(horizontalDistance) > Math.abs(verticalDistance)) goToDay(activeDay + (horizontalDistance < 0 ? 1 : -1))
           touchStart.current = null
         }}>
-          <div className="mb-8 flex items-center justify-between text-sm text-ink/50"><span>{isLibrary ? `Topic ${String(topic.day).padStart(3, '0')}` : `Day ${String(topic.day).padStart(2, '0')}`}</span><div className="topic-meta-actions"><button className={`favorite-button ${favoritesState[selectedCourse]?.includes(topic.day) ? 'active' : ''}`} type="button" aria-label={favoritesState[selectedCourse]?.includes(topic.day) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => toggleFavorite(topic.day)}><Heart size={18} fill={favoritesState[selectedCourse]?.includes(topic.day) ? 'currentColor' : 'none'} /></button><div ref={shareMenuRef} className="share-menu"><button className="share-button" type="button" aria-label="Share this topic" aria-expanded={isShareOpen} onClick={() => setIsShareOpen((open) => !open)}><Share2 size={18} /></button>{isShareOpen && <div className="share-options" role="menu"><button type="button" onClick={copyShareLink}><Copy size={15} /> {copyState === 'copied' ? 'Copied' : 'Copy link'}</button><button type="button" onClick={shareToMessages}><MessageCircle size={15} /> Share to Messages</button><button type="button" onClick={shareToWhatsApp}><MessageCircle size={15} /> Share to WhatsApp</button><button type="button" onClick={shareToEmail}><Mail size={15} /> Share by email</button></div>}</div><span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${partColors[topic.part]}`}>{topic.part}</span></div></div>
+          <div className="topic-meta-row mb-8 flex items-center justify-between text-sm text-ink/50"><span>{isLibrary ? `Topic ${String(topic.day).padStart(3, '0')}` : `Day ${String(topic.day).padStart(2, '0')}`}</span><div className="topic-meta-actions"><button className={`favorite-button ${favoritesState[selectedCourse]?.includes(topic.day) ? 'active' : ''}`} type="button" aria-label={favoritesState[selectedCourse]?.includes(topic.day) ? 'Remove from favorites' : 'Add to favorites'} onClick={() => toggleFavorite(topic.day)}><Heart size={18} fill={favoritesState[selectedCourse]?.includes(topic.day) ? 'currentColor' : 'none'} /></button><div ref={shareMenuRef} className="share-menu"><button className="share-button" type="button" aria-label="Share this topic" aria-expanded={isShareOpen} onClick={() => setIsShareOpen((open) => !open)}><Share2 size={18} /></button>{isShareOpen && <div className="share-options" role="menu"><button type="button" onClick={copyShareLink}><Copy size={15} /> {copyState === 'copied' ? 'Copied' : 'Copy link'}</button><button type="button" onClick={shareToMessages}><MessageCircle size={15} /> Share to Messages</button><button type="button" onClick={shareToWhatsApp}><MessageCircle size={15} /> Share to WhatsApp</button><button type="button" onClick={shareToEmail}><Mail size={15} /> Share by email</button></div>}</div><span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider ${partColors[topic.part]}`}>{topic.part}</span></div></div>
           <p className="mb-3 font-bold uppercase tracking-[0.25em] text-moss">{topic.part} / The essentials</p>
           <div className="topic-title-row"><h1 className="max-w-3xl font-display text-5xl leading-[0.98] sm:text-7xl">{topic.title}</h1></div>
           <p className="mt-8 max-w-2xl text-xl leading-relaxed text-ink/70">{topic.introduction}</p>
@@ -559,7 +586,7 @@ export default function App() {
             <div className="space-y-8"><div><h2 className="section-label">For today</h2><div className="space-y-3 text-base leading-relaxed text-ink/75">{topic.application.map((line) => <p key={line}>{line}</p>)}</div></div><div className="journal-panel"><h2 className="section-label">My reflection</h2><p className="font-display text-2xl leading-snug">{topic.reflection}</p><textarea aria-label={`Journal entry for ${topic.title}`} placeholder="Write what stays with you..." value={journalText} onChange={(event) => saveJournal(event.target.value)} /></div></div>
           </div>
 
-          <div className="mt-14 flex justify-between border-t border-ink/10 pt-5"><button className="nav-button" disabled={activeDay === 1} onClick={() => goToDay(activeDay - 1)}><ChevronLeft size={18} /> Previous</button><button className="nav-button" disabled={activeDay === activeCourse.length} onClick={() => goToDay(activeDay + 1)}>Next <ChevronRight size={18} /></button></div>
+          <div className="mt-14 flex justify-between border-t border-ink/10 pt-5"><button className="nav-button" disabled={activeDay === 1} onClick={() => goToDay(activeDay - 1)}><ChevronLeft size={18} /> Previous</button><button className="nav-button" disabled={activeDay === activeCourse.length} onClick={() => goToDay(activeDay + 1, true)}>Next <ChevronRight size={18} /></button></div>
         </section>
       </div>
 

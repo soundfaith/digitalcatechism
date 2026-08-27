@@ -12,6 +12,7 @@ button { font: inherit; }
 .day-button { display: flex; min-width: 74px; flex-direction: column; gap: 4px; border: 1px solid transparent; border-radius: 4px; padding: 11px 12px; text-align: left; color: rgb(36 49 45 / 55%); transition: all 180ms ease; }
 .day-button:hover { background: rgb(85 117 104 / 8%); color: #24312d; }
 .day-button.active { border-color: transparent; background: transparent; color: #557568; }
+.day-button.completed { color: #d88965; }
 .section-label { margin-bottom: 18px; color: #557568; font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
 .topic-page { min-width: 0; padding-top: 22px; animation: appear 420ms ease both; }
 .topic-page > * { animation: content-reveal 460ms ease both; }
@@ -41,6 +42,7 @@ button { font: inherit; }
 .sidebar-tools { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid rgb(36 49 45 / 10%); padding-bottom: 18px; }
 .sidebar-tools button { display: inline-flex; align-items: center; gap: 7px; color: rgb(36 49 45 / 62%); font-size: 13px; font-weight: 700; text-align: left; }
 .topic-title-row { position: relative; z-index: 20; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.topic-meta-row { position: relative; z-index: 30; }
 .topic-meta-actions { display: flex; align-items: center; gap: 8px; }
 .favorite-button { display: grid; height: 30px; width: 30px; place-items: center; flex-shrink: 0; padding: 0; color: rgb(216 137 101 / 72%); transition: color 180ms ease, transform 180ms ease; }
 .favorite-button:hover, .favorite-button.active { color: #d88965; transform: scale(1.08); }
@@ -97,6 +99,7 @@ button { font: inherit; }
 :root.dark .day-button { color: rgb(235 232 222 / 65%); }
 :root.dark .day-button:hover { background: rgb(135 177 157 / 12%); color: #ebe8de; }
 :root.dark .day-button.active { border-color: transparent; background: transparent; color: #87b19d; }
+:root.dark .day-button.completed { color: #e09a78; }
 :root.dark .active-day-box { border-color: rgb(135 177 157 / 35%); background: rgb(135 177 157 / 18%); }
 :root.dark .section-label { color: #87b19d; }
 :root.dark .nav-button { border-color: rgb(235 232 222 / 35%); color: rgb(235 232 222 / 78%); }
