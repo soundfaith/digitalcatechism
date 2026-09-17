@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Clock3, Copy, Headphones, Heart, Mail, MessageCircle, Moon, NotebookPen, Pause, Play, Search, Share2, Sun, X } from 'lucide-react'
+import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Clock3, Copy, Headphones, Heart, Mail, Menu, MessageCircle, Moon, NotebookPen, Pause, Play, Search, Share2, Sun, X } from 'lucide-react'
 import { completeCccLibrary, fourteenDayCourse, sevenDayCourse, thirtyDayCourse } from './data/course'
 
 const partColors = {
-  Creed: 'bg-moss text-white',
-  Sacraments: 'bg-clay text-white',
-  Morality: 'bg-amber-700 text-white',
-  Prayer: 'bg-sky-700 text-white',
+  Creed: 'pill-creed',
+  Sacraments: 'pill-sacraments',
+  Morality: 'pill-morality',
+  Prayer: 'pill-prayer',
 }
 
 type CourseId = 'seven' | 'fourteen' | 'thirty' | 'library'
@@ -97,10 +97,12 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [audioProgress, setAudioProgress] = useState(0)
   const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle')
   const [librarySearch, setLibrarySearch] = useState('')
   const [librarySidebarSearch, setLibrarySidebarSearch] = useState('')
+  const [overviewSearch, setOverviewSearch] = useState('')
   const [transitionDirection, setTransitionDirection] = useState<'next' | 'previous'>('next')
   const [isDark, setIsDark] = useState(() => {
     const savedTheme = window.localStorage.getItem('digital-catechism-theme')
@@ -112,6 +114,7 @@ export default function App() {
   const dayNavigationRef = useRef<HTMLElement | null>(null)
   const dayButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({})
   const shareMenuRef = useRef<HTMLDivElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const audioTimerRef = useRef<number | null>(null)
   const speechRunRef = useRef(0)
   const hasReadTopicRef = useRef(false)
@@ -184,6 +187,15 @@ export default function App() {
   }, [isShareOpen])
 
   useEffect(() => {
+    if (!isMenuOpen) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setIsMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => document.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [isMenuOpen])
+
+  useEffect(() => {
     const handlePopState = () => {
       const nextRoute = getTopicRoute()
       if (!nextRoute || !courses[nextRoute.courseId].topics[nextRoute.topic - 1]) {
@@ -218,12 +230,14 @@ export default function App() {
   const showJournal = () => {
     window.speechSynthesis.cancel()
     setIsPlaying(false)
+    setIsMenuOpen(false)
     setView('journal')
   }
 
   const showFavorites = () => {
     window.speechSynthesis.cancel()
     setIsPlaying(false)
+    setIsMenuOpen(false)
     setView('favorites')
   }
 
@@ -479,6 +493,19 @@ export default function App() {
     startSpeech()
   }
 
+  const renderHeaderMenu = () => (
+    <div ref={menuRef} className="header-menu">
+      <button className="menu-button" type="button" aria-label="Open menu" aria-expanded={isMenuOpen} onClick={() => setIsMenuOpen((open) => !open)}>
+        <Menu size={19} />
+      </button>
+      {isMenuOpen && <div className="header-menu-options" role="menu">
+        <button type="button" onClick={showJournal}><NotebookPen size={16} /> My Journal</button>
+        <button type="button" onClick={showFavorites}><Heart size={16} /> Favorites</button>
+        <button type="button" onClick={() => setIsDark((themeIsDark) => !themeIsDark)}><span className="menu-option-icon">{isDark ? <Sun size={16} /> : <Moon size={16} />}</span>{isDark ? 'Light theme' : 'Dark theme'}</button>
+      </div>}
+    </div>
+  )
+
   if (view === 'landing') {
     return (
       <main className={`min-h-screen bg-parchment text-ink transition-colors ${isDark ? 'dark' : ''}`}>
@@ -487,16 +514,16 @@ export default function App() {
             <div className="shrink-0 rounded-full bg-ink p-2 text-parchment"><BookOpen size={18} /></div>
             <span className="truncate font-display text-xl">Digital Catechism</span>
           </div>
-          <button className="theme-button" type="button" aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setIsDark((themeIsDark) => !themeIsDark)}>
-            {isDark ? <Sun size={17} /> : <Moon size={17} />}
-          </button>
+          {renderHeaderMenu()}
         </header>
         <section className="mx-auto max-w-7xl px-5 pb-24 pt-14 sm:px-8 sm:pt-24">
           <p className="mb-4 text-xs font-bold uppercase tracking-[0.25em] text-moss">Begin where you are</p>
-          {resumeCourse && resumeTopic && <div className="resume-card"><div><p className="resume-kicker">Continue where you left off</p><p className="resume-course">{resumeCourse.title}</p><h2 className="mt-2 font-display text-3xl">{resumeTopic.title}</h2><p className="mt-2 text-sm text-ink/60">{resumeCourseId === 'library' ? `Topic ${resumeDay}` : `Day ${resumeDay}`}</p></div><button className="resume-button" type="button" onClick={() => openCourse(resumeCourseId!)}>Resume <ChevronRight size={17} /></button></div>}
           <h1 className="max-w-3xl font-display text-5xl leading-[0.98] sm:text-7xl">A faithful rhythm for every season.</h1>
           <p className="mt-7 max-w-2xl text-xl leading-relaxed text-ink/70">Choose a course and make a little room each day for the essential shape of Catholic faith.</p>
-          <div className="mt-16 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          {resumeCourse && resumeTopic && <button className="resume-button mt-7" type="button" onClick={() => openCourse(resumeCourseId!)}>
+            Continue where you left off · {resumeCourse.title} · {resumeCourseId === 'library' ? `Topic ${resumeDay}` : `Day ${resumeDay}`} <ChevronRight size={17} />
+          </button>}
+          <div className="mt-16 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             <button className="course-card" type="button" onClick={() => showOverview('seven')}>
               <span className="course-card-number">01</span><span className="course-card-kicker">A short beginning</span><h2 className="font-display text-3xl">CCC in 7 Days</h2><p className="mt-4 text-base leading-relaxed text-ink/65">{courses.seven.description}</p><span className="course-card-action">Start the journey <ChevronRight size={17} /></span>
             </button>
@@ -514,10 +541,55 @@ export default function App() {
   if (view === 'overview') {
     const overviewCourse = courses[selectedCourse]
     const hasStarted = resumeState[selectedCourse] !== undefined
+    const filteredOverviewTopics = overviewCourse.topics.filter((item) => {
+      const searchTerm = overviewSearch.trim().toLowerCase()
+      if (!searchTerm) return true
+      return item.title.toLowerCase().includes(searchTerm) || item.part.toLowerCase().includes(searchTerm)
+    })
+
     return (
       <main className={`min-h-screen bg-parchment text-ink transition-colors ${isDark ? 'dark' : ''}`}>
-        <header className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8"><div className="flex min-w-0 items-center gap-3"><div className="shrink-0 rounded-full bg-ink p-2 text-parchment"><BookOpen size={18} /></div><button className="truncate font-display text-xl" type="button" onClick={showLanding}>Digital Catechism</button></div><button className="theme-button" type="button" aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setIsDark((themeIsDark) => !themeIsDark)}>{isDark ? <Sun size={17} /> : <Moon size={17} />}</button></header>
-        <section className="mx-auto max-w-7xl px-5 pb-24 pt-12 sm:px-8 sm:pt-20"><button className="catalog-button" type="button" onClick={showLanding}><ArrowLeft size={16} /> All courses</button><div className="overview-heading"><div><p className="mt-12 text-xs font-bold uppercase tracking-[0.25em] text-moss">Course overview</p><h1 className="mt-4 max-w-3xl font-display text-5xl leading-[0.98] sm:text-7xl">{overviewCourse.title}</h1><p className="mt-7 max-w-2xl text-xl leading-relaxed text-ink/70">{overviewCourse.description}</p><div className="mt-10 flex flex-wrap gap-6 text-sm text-ink/60"><span className="flex items-center gap-2"><Clock3 size={16} className="text-clay" /> {selectedCourse === 'library' ? 'Browse at your own pace' : `${overviewCourse.topics.length * 5} minutes total`}</span><span>{overviewCourse.topics.length} {selectedCourse === 'library' ? 'topics' : 'days'}</span></div></div><aside className="overview-actions"><button className="resume-button" type="button" onClick={() => openCourse(selectedCourse)}>{hasStarted ? 'Resume' : selectedCourse === 'library' ? 'Explore library' : 'Start Day 1'} <ChevronRight size={17} /></button>{hasStarted && <p className="mt-4 text-sm text-ink/60">Continue from {selectedCourse === 'library' ? `Topic ${resumeState[selectedCourse]}` : `Day ${resumeState[selectedCourse]}`}</p>}</aside></div><div className="mt-14"><h2 className="section-label">{selectedCourse === 'library' ? 'Library contents' : 'Day-by-day outline'}</h2><div className="overview-outline">{overviewCourse.topics.map((item) => <button className="overview-item" type="button" key={item.day} onClick={() => openOverviewTopic(item.day)}><span>{selectedCourse === 'library' ? String(item.day).padStart(3, '0') : `Day ${item.day}`}</span><strong>{item.title}</strong><em>{item.part}</em></button>)}</div></div></section>
+        <header className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8"><div className="flex min-w-0 items-center gap-3"><div className="shrink-0 rounded-full bg-ink p-2 text-parchment"><BookOpen size={18} /></div><button className="truncate font-display text-xl" type="button" onClick={showLanding}>Digital Catechism</button></div>{renderHeaderMenu()}</header>
+        <section className="mx-auto max-w-6xl px-5 pb-24 pt-12 sm:px-8 sm:pt-20">
+          <button className="catalog-button" type="button" onClick={showLanding}><ArrowLeft size={16} /> All courses</button>
+
+          <div className="mt-12">
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-moss">Course overview</p>
+            <h1 className="mt-4 max-w-3xl font-display text-5xl leading-[0.98] sm:text-7xl">{overviewCourse.title}</h1>
+            <p className="mt-7 max-w-2xl text-xl leading-relaxed text-ink/70">{overviewCourse.description}</p>
+
+            <div className="mt-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-wrap gap-6 text-sm text-ink/60">
+                <span className="flex items-center gap-2"><Clock3 size={16} className="text-clay" /> {selectedCourse === 'library' ? 'Browse at your own pace' : `${overviewCourse.topics.length * 5} minutes total`}</span>
+                <span>{overviewCourse.topics.length} {selectedCourse === 'library' ? 'topics' : 'days'}</span>
+              </div>
+              <button className="resume-button" type="button" onClick={() => openCourse(selectedCourse)}>{hasStarted ? 'Resume' : selectedCourse === 'library' ? 'Explore library' : 'Start Day 1'} <ChevronRight size={17} /></button>
+            </div>
+          </div>
+
+          <div className="mt-14">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="section-label mb-0">{selectedCourse === 'library' ? 'Library contents' : 'Day-by-day outline'}</h2>
+              <label className="overview-search">
+                <Search size={15} />
+                <input type="search" aria-label={`Search ${selectedCourse === 'library' ? 'library topics' : 'course topics'}`} placeholder="Search topics" value={overviewSearch} onChange={(event) => setOverviewSearch(event.target.value)} />
+              </label>
+            </div>
+
+            <div className="overview-list">
+              {filteredOverviewTopics.length > 0 ? filteredOverviewTopics.map((item) => (
+                <button className="overview-item" type="button" key={item.day} onClick={() => openOverviewTopic(item.day)}>
+                  <span className="overview-item-number">{selectedCourse === 'library' ? String(item.day).padStart(3, '0') : `Day ${item.day}`}</span>
+                  <div className="overview-item-copy">
+                    <span className="overview-item-part">{item.part}</span>
+                    <strong>{item.title}</strong>
+                  </div>
+                  <span className="overview-item-arrow"><ChevronRight size={16} /></span>
+                </button>
+              )) : <p className="text-sm text-ink/60">No topics match your search.</p>}
+            </div>
+          </div>
+        </section>
       </main>
     )
   }
@@ -525,9 +597,9 @@ export default function App() {
   if (view === 'journal' || view === 'favorites') {
     const journalItems = Object.entries(journalState).filter(([, value]) => value.trim()).map(([key, value]) => { const [courseId, dayValue] = key.split('-') as [CourseId, string]; return { courseId, day: Number(dayValue), value } }).sort((left, right) => right.day - left.day)
     const favoriteItems = (Object.keys(favoritesState) as CourseId[]).flatMap((courseId) => (favoritesState[courseId] ?? []).map((day) => ({ courseId, day, topic: courses[courseId].topics[day - 1] }))).filter((item) => item.topic)
-    return (
-      <main className={`min-h-screen bg-parchment text-ink transition-colors ${isDark ? 'dark' : ''}`}><header className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8"><div className="flex min-w-0 items-center gap-3"><div className="shrink-0 rounded-full bg-ink p-2 text-parchment"><BookOpen size={18} /></div><button className="truncate font-display text-xl" type="button" onClick={showLanding}>Digital Catechism</button></div><button className="theme-button" type="button" aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setIsDark((themeIsDark) => !themeIsDark)}>{isDark ? <Sun size={17} /> : <Moon size={17} />}</button></header><section className="mx-auto max-w-4xl px-5 pb-24 pt-12 sm:px-8 sm:pt-20"><button className="catalog-button" type="button" onClick={() => { setSelectedCourse(selectedCourse); setView('reader') }}><ArrowLeft size={16} /> Back to reading</button><p className="mt-12 text-xs font-bold uppercase tracking-[0.25em] text-moss">{view === 'journal' ? 'Your formation' : 'Saved for later'}</p><h1 className="mt-4 font-display text-5xl sm:text-7xl">{view === 'journal' ? 'My Journal' : 'Favorites'}</h1><p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink/70">{view === 'journal' ? 'A private place for the thoughts you want to carry forward.' : 'The topics that have stayed with you.'}</p><div className="mt-14 space-y-5">{view === 'journal' ? journalItems.map((entry) => <article className="saved-entry" key={`${entry.courseId}-${entry.day}`}><p className="saved-entry-meta">{courses[entry.courseId].title} · {entry.courseId === 'library' ? `Topic ${entry.day}` : `Day ${entry.day}`}</p><h2 className="font-display text-2xl">{courses[entry.courseId].topics[entry.day - 1]?.title}</h2><p className="mt-3 whitespace-pre-wrap text-base leading-relaxed text-ink/75">{entry.value}</p></article>) : favoriteItems.map((item) => <button className="saved-entry favorite-entry" type="button" key={`${item.courseId}-${item.day}`} onClick={() => { setSelectedCourse(item.courseId); setActiveDay(item.day); setView('reader') }}><Heart size={17} fill="currentColor" /><div><p className="saved-entry-meta">{courses[item.courseId].title} · {item.courseId === 'library' ? `Topic ${item.day}` : `Day ${item.day}`}</p><h2 className="font-display text-2xl">{item.topic.title}</h2></div><ChevronRight size={18} /></button>)}{(view === 'journal' ? journalItems.length : favoriteItems.length) === 0 && <p className="text-ink/60">Nothing saved here yet.</p>}</div></section></main>
-    )
+    return (<>
+      <main className={`min-h-screen bg-parchment text-ink transition-colors ${isDark ? 'dark' : ''}`}><header className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8"><div className="flex min-w-0 items-center gap-3"><div className="shrink-0 rounded-full bg-ink p-2 text-parchment"><BookOpen size={18} /></div><button className="truncate font-display text-xl" type="button" onClick={showLanding}>Digital Catechism</button></div><div className="flex items-center gap-4">{renderHeaderMenu()}</div></header><section className="mx-auto max-w-4xl px-5 pb-24 pt-12 sm:px-8 sm:pt-20"><button className="catalog-button" type="button" onClick={() => { setSelectedCourse(selectedCourse); setView('reader') }}><ArrowLeft size={16} /> Back to reading</button><p className="mt-12 text-xs font-bold uppercase tracking-[0.25em] text-moss">{view === 'journal' ? 'Your formation' : 'Saved for later'}</p><h1 className="mt-4 font-display text-5xl sm:text-7xl">{view === 'journal' ? 'My Journal' : 'Favorites'}</h1><p className="mt-6 max-w-2xl text-lg leading-relaxed text-ink/70">{view === 'journal' ? 'A private place for the thoughts you want to carry forward.' : 'The topics that have stayed with you.'}</p><div className="mt-14 space-y-5">{view === 'journal' ? journalItems.map((entry) => <article className="saved-entry" key={`${entry.courseId}-${entry.day}`}><p className="saved-entry-meta">{courses[entry.courseId].title} · {entry.courseId === 'library' ? `Topic ${entry.day}` : `Day ${entry.day}`}</p><h2 className="font-display text-2xl">{courses[entry.courseId].topics[entry.day - 1]?.title}</h2><p className="mt-3 whitespace-pre-wrap text-base leading-relaxed text-ink/75">{entry.value}</p></article>) : favoriteItems.map((item) => <button className="saved-entry favorite-entry" type="button" key={`${item.courseId}-${item.day}`} onClick={() => { setSelectedCourse(item.courseId); setActiveDay(item.day); setView('reader') }}><Heart size={17} fill="currentColor" /><div><p className="saved-entry-meta">{courses[item.courseId].title} · {item.courseId === 'library' ? `Topic ${item.day}` : `Day ${item.day}`}</p><h2 className="font-display text-2xl">{item.topic.title}</h2></div><ChevronRight size={18} /></button>)}{(view === 'journal' ? journalItems.length : favoriteItems.length) === 0 && <p className="text-ink/60">Nothing saved here yet.</p>}</div></section></main>
+    </>)
   }
 
   return (
@@ -540,19 +612,16 @@ export default function App() {
         <div className="flex items-center gap-4">
           <button className="catalog-button" type="button" onClick={showLanding}><ArrowLeft size={16} /> <span className="hidden sm:inline">All courses</span></button>
           <span className="hidden text-xs font-bold uppercase tracking-[0.2em] text-moss sm:block">{courses[selectedCourse].detail}</span>
-          <button className="theme-button" type="button" aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'} onClick={() => setIsDark((themeIsDark) => !themeIsDark)}>
-            {isDark ? <Sun size={17} /> : <Moon size={17} />}
-          </button>
+          {renderHeaderMenu()}
         </div>
       </header>
 
       <div className="mx-auto grid min-w-0 max-w-7xl gap-8 px-5 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-8 lg:grid-cols-[280px_1fr] lg:gap-16 lg:pb-32">
         <aside className="min-w-0 pt-5 lg:sticky lg:top-5 lg:h-fit">
           <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-moss">Your journey</p>
-          <div className="sidebar-tools"><button type="button" onClick={showJournal}><NotebookPen size={15} /> My Journal</button><button type="button" onClick={showFavorites}><Heart size={15} /> Favorites</button></div>
           {isLibrary && <label className="library-sidebar-search"><Search size={15} /><input type="search" aria-label="Search library topics" placeholder="Search topics" value={librarySidebarSearch} onChange={(event) => setLibrarySidebarSearch(event.target.value)} /></label>}
           {isLibrary && <button className="library-topic-button" type="button" onClick={() => setIsLibraryPickerOpen(true)}><Search size={16} /><span className="truncate">{topic.title}</span><span className="library-topic-count">{activeDay} / {activeCourse.length}</span></button>}
-          <nav ref={dayNavigationRef} className={`day-navigation min-w-0 max-w-full gap-2 pb-2 ${isLongCourse && isLibrary ? 'long-navigation' : 'flex overflow-x-auto lg:block lg:space-y-2'}`}>
+          <nav ref={dayNavigationRef} className={`day-navigation min-w-0 max-w-full gap-2 pb-2 ${isLibrary ? 'long-navigation' : `flex overflow-x-auto lg:block lg:space-y-2${isLongCourse ? ' lg:max-h-[calc(100vh_-_190px)] lg:overflow-y-auto lg:overscroll-contain lg:pr-2' : ''}`}`}>
             <span className="active-day-box" aria-hidden="true" style={{ transform: `translate(${activeDayBox.x}px, ${activeDayBox.y}px)`, width: activeDayBox.width, height: activeDayBox.height }} />
             {visibleLibraryTopics.map((day) => (
               <button ref={(element) => { dayButtonRefs.current[day.day] = element }} key={day.day} onClick={() => goToDay(day.day)} aria-current={activeDay === day.day ? 'step' : undefined} className={`day-button ${activeDay === day.day ? 'active' : ''} ${!isLibrary && completedState[selectedCourse]?.includes(day.day) ? 'completed' : ''}`}>
