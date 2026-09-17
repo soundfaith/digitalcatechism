@@ -3,10 +3,10 @@ import { ArrowLeft, BookOpen, ChevronLeft, ChevronRight, Clock3, Copy, Headphone
 import { completeCccLibrary, fourteenDayCourse, sevenDayCourse, thirtyDayCourse } from './data/course'
 
 const partColors = {
-  Creed: 'pill-creed',
-  Sacraments: 'pill-sacraments',
+  Creed: 'pill-ink',
+  Sacraments: 'pill-slate-dark',
   Morality: 'pill-morality',
-  Prayer: 'pill-prayer',
+  Prayer: 'pill-ink',
 }
 
 type CourseId = 'seven' | 'fourteen' | 'thirty' | 'library'
